@@ -248,11 +248,27 @@ module.exports = function(RED) {
 
                     if (node.search === "_id_") {
                         var id = getDocumentId(msg.payload);
+                        var attachmentName = getAttachementName(msg.payload);
+                        var attachmentType = getAttachementType(msg.payload);
                         node.inputId = id;
-
-                        db.get(id, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
-                        });
+                        if (attachmentName){
+                            if (attachmentType){
+                                db.attachment.get(id, attachmentName, function(err, body) {
+                                    sendAttachementOnPayload(err, body, msg, attachmentType);
+                                });
+                            }else{
+                                db.get(id, function(err, body) {
+                                    attachmentType = body._attachments[attachmentName]["content_type"];
+                                    db.attachment.get(id, attachmentName, function(err, body) {
+                                        sendAttachementOnPayload(err, body, msg, attachmentType);
+                                    });
+                                });
+                            }
+                        }else{
+                            db.get(id, function(err, body) {
+                                sendDocumentOnPayload(err, body, msg);
+                            });
+                        }
                     }
                     else if (node.search === "_idx_") {
                         options.query = options.query || options.q || formatSearchQuery(msg.payload);
@@ -283,7 +299,22 @@ module.exports = function(RED) {
 
             return payload;
         }
-
+        function getAttachementName(payload) {
+            if (typeof payload === "object") {
+                if ("attachmentName" in payload) {
+                    return payload.attachmentName;
+                }
+            }
+            return null;
+        }
+        function getAttachementType(payload) {
+            if (typeof payload === "object") {
+                if ("attachmentType" in payload) {
+                    return payload.attachmentType;
+                }
+            }
+            return null;
+        }
         function formatSearchQuery(query) {
             if (typeof query === "object") {
                 // useful when passing the query on HTTP params
@@ -298,7 +329,20 @@ module.exports = function(RED) {
             }
             return query;
         }
-
+        function sendAttachementOnPayload(err, body, msg, attachmentType){
+            if (!err) {
+                msg.cloudant = body;
+                msg.payload = body;
+                msg.headers = {
+                    "Content-Type" : attachmentType
+                }
+            }
+            else {
+                msg.payload = null;
+                node.error(err.description, err);
+            }
+            node.send(msg);
+        }
         function sendDocumentOnPayload(err, body, msg) {
             if (!err) {
                 msg.cloudant = body;
