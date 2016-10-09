@@ -240,52 +240,63 @@ module.exports = function(RED) {
         };
 
         Cloudant(credentials, function(err, cloudant) {
-            if (err) { node.error(err.description, err); }
+            if (err) {
+                node.error(err.description, err);
+                node.cloudantError = err;
+            }
             else {
-                node.on("input", function(msg) {
-                    var db = cloudant.use(node.database);
-                    var options = (typeof msg.payload === "object") ? msg.payload : {};
+                node.cloudant = cloudant;
+            }
+        });
 
-                    if (node.search === "_id_") {
-                        var id = getDocumentId(msg.payload);
-                        var attachmentName = getAttachementName(msg.payload);
-                        var attachmentType = getAttachementType(msg.payload);
-                        node.inputId = id;
-                        if (attachmentName){
-                            if (attachmentType){
-                                db.attachment.get(id, attachmentName, function(err, body) {
-                                    sendAttachementOnPayload(err, body, msg, attachmentType);
-                                });
-                            }else{
-                                db.get(id, function(err, body) {
-                                    attachmentType = body._attachments[attachmentName]["content_type"];
-                                    db.attachment.get(id, attachmentName, function(err, body) {
-                                        sendAttachementOnPayload(err, body, msg, attachmentType);
-                                    });
-                                });
-                            }
-                        }else{
-                            db.get(id, function(err, body) {
-                                sendDocumentOnPayload(err, body, msg);
+        node.on("input", function(msg) {
+            if (!node.cloudant){
+                //msg.payload = node.cloudantError;
+                msg.payload = null;
+                node.error(node.cloudantError, msg);
+                return;
+            }
+            var db = cloudant.use(node.database);
+            var options = (typeof msg.payload === "object") ? msg.payload : {};
+
+            if (node.search === "_id_") {
+                var id = getDocumentId(msg.payload);
+                var attachmentName = getAttachementName(msg.payload);
+                var attachmentType = getAttachementType(msg.payload);
+                node.inputId = id;
+                if (attachmentName){
+                    if (attachmentType){
+                        db.attachment.get(id, attachmentName, function(err, body) {
+                            sendAttachementOnPayload(err, body, msg, attachmentType);
+                        });
+                    }else{
+                        db.get(id, function(err, body) {
+                            attachmentType = body._attachments[attachmentName]["content_type"];
+                            db.attachment.get(id, attachmentName, function(err, body) {
+                                sendAttachementOnPayload(err, body, msg, attachmentType);
                             });
-                        }
-                    }
-                    else if (node.search === "_idx_") {
-                        options.query = options.query || options.q || formatSearchQuery(msg.payload);
-                        options.include_docs = options.include_docs || true;
-                        options.limit = options.limit || 200;
-
-                        db.search(node.design, node.index, options, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
                         });
                     }
-                    else if (node.search === "_all_") {
-                        options.include_docs = options.include_docs || true;
+                }else{
+                    db.get(id, function(err, body) {
+                        sendDocumentOnPayload(err, body, msg);
+                    });
+                }
+            }
+            else if (node.search === "_idx_") {
+                options.query = options.query || options.q || formatSearchQuery(msg.payload);
+                options.include_docs = options.include_docs || true;
+                options.limit = options.limit || 200;
 
-                        db.list(options, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
-                        });
-                    }
+                db.search(node.design, node.index, options, function(err, body) {
+                    sendDocumentOnPayload(err, body, msg);
+                });
+            }
+            else if (node.search === "_all_") {
+                options.include_docs = options.include_docs || true;
+
+                db.list(options, function(err, body) {
+                    sendDocumentOnPayload(err, body, msg);
                 });
             }
         });
