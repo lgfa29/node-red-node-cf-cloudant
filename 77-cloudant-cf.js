@@ -223,7 +223,7 @@ module.exports = function(RED) {
 
     function CloudantInNode(n) {
         RED.nodes.createNode(this,n);
-
+		console.log("CloudantInNode new version");
         this.cloudantConfig = _getCloudantConfig(n);
         this.database       = _cleanDatabaseName(n.database, this);
         this.search         = n.search;
@@ -240,36 +240,65 @@ module.exports = function(RED) {
         };
 
         Cloudant(credentials, function(err, cloudant) {
-            if (err) { node.error(err.description, err); }
+            if (err) {
+                node.error(err.description, err);
+                node.cloudantError = err;
+            }
             else {
-                node.on("input", function(msg) {
-                    var db = cloudant.use(node.database);
-                    var options = (typeof msg.payload === "object") ? msg.payload : {};
+				node.log("CloudantInNode connection succeeded");
+                node.cloudant = cloudant;
+            }
+        });
 
-                    if (node.search === "_id_") {
-                        var id = getDocumentId(msg.payload);
-                        node.inputId = id;
+        node.on("input", function(msg) {
+            if (!node.cloudant){
+                //msg.payload = node.cloudantError;
+                msg.payload = null;
+                node.error(node.cloudantError, msg);
+                return;
+            }
+            var db = node.cloudant.use(node.database);
 
+            var options = (typeof msg.payload === "object") ? msg.payload : {};
+
+            if (node.search === "_id_") {
+                var id = getDocumentId(msg.payload);
+                var attachmentName = getAttachementName(msg.payload);
+                var attachmentType = getAttachementType(msg.payload);
+                node.inputId = id;
+                if (attachmentName){
+                    if (attachmentType){
+                        db.attachment.get(id, attachmentName, function(err, body) {
+                            sendAttachementOnPayload(err, body, msg, attachmentType);
+                        });
+                    }else{
                         db.get(id, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
+                            attachmentType = body._attachments[attachmentName]["content_type"];
+                            db.attachment.get(id, attachmentName, function(err, body) {
+                                sendAttachementOnPayload(err, body, msg, attachmentType);
+                            });
                         });
                     }
-                    else if (node.search === "_idx_") {
-                        options.query = options.query || options.q || formatSearchQuery(msg.payload);
-                        options.include_docs = options.include_docs || true;
-                        options.limit = options.limit || 200;
+                }else{
+                    db.get(id, function(err, body) {
+                        sendDocumentOnPayload(err, body, msg);
+                    });
+                }
+            }
+            else if (node.search === "_idx_") {
+                options.query = options.query || options.q || formatSearchQuery(msg.payload);
+                options.include_docs = options.include_docs || true;
+                options.limit = options.limit || 200;
 
-                        db.search(node.design, node.index, options, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
-                        });
-                    }
-                    else if (node.search === "_all_") {
-                        options.include_docs = options.include_docs || true;
+                db.search(node.design, node.index, options, function(err, body) {
+                    sendDocumentOnPayload(err, body, msg);
+                });
+            }
+            else if (node.search === "_all_") {
+                options.include_docs = options.include_docs || true;
 
-                        db.list(options, function(err, body) {
-                            sendDocumentOnPayload(err, body, msg);
-                        });
-                    }
+                db.list(options, function(err, body) {
+                    sendDocumentOnPayload(err, body, msg);
                 });
             }
         });
@@ -283,7 +312,22 @@ module.exports = function(RED) {
 
             return payload;
         }
-
+        function getAttachementName(payload) {
+            if (typeof payload === "object") {
+                if ("attachmentName" in payload) {
+                    return payload.attachmentName;
+                }
+            }
+            return null;
+        }
+        function getAttachementType(payload) {
+            if (typeof payload === "object") {
+                if ("attachmentType" in payload) {
+                    return payload.attachmentType;
+                }
+            }
+            return null;
+        }
         function formatSearchQuery(query) {
             if (typeof query === "object") {
                 // useful when passing the query on HTTP params
@@ -298,7 +342,20 @@ module.exports = function(RED) {
             }
             return query;
         }
-
+        function sendAttachementOnPayload(err, body, msg, attachmentType){
+            if (!err) {
+                msg.cloudant = body;
+                msg.payload = body;
+                msg.headers = {
+                    "Content-Type" : attachmentType
+                }
+            }
+            else {
+                msg.payload = null;
+                node.error(err.description, err);
+            }
+            node.send(msg);
+        }
         function sendDocumentOnPayload(err, body, msg) {
             if (!err) {
                 msg.cloudant = body;
