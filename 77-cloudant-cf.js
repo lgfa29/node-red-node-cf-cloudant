@@ -223,7 +223,7 @@ module.exports = function(RED) {
 
     function CloudantInNode(n) {
         RED.nodes.createNode(this,n);
-
+		console.log("CloudantInNode new version");
         this.cloudantConfig = _getCloudantConfig(n);
         this.database       = _cleanDatabaseName(n.database, this);
         this.search         = n.search;
@@ -245,6 +245,7 @@ module.exports = function(RED) {
                 node.cloudantError = err;
             }
             else {
+				node.log("CloudantInNode connection succeeded");
                 node.cloudant = cloudant;
             }
         });
@@ -256,7 +257,8 @@ module.exports = function(RED) {
                 node.error(node.cloudantError, msg);
                 return;
             }
-            var db = cloudant.use(node.database);
+            var db = node.cloudant.use(node.database);
+
             var options = (typeof msg.payload === "object") ? msg.payload : {};
 
             if (node.search === "_id_") {
