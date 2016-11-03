@@ -81,6 +81,7 @@ module.exports = function(RED) {
         this.operation      = n.operation;
         this.payonly        = n.payonly || false;
         this.database       = _cleanDatabaseName(n.database, this);
+        console.log("CloudantOutNode this.database = " + this.database);
         this.cloudantConfig = _getCloudantConfig(n);
 
         var node = this;
@@ -223,15 +224,17 @@ module.exports = function(RED) {
 
     function CloudantInNode(n) {
         RED.nodes.createNode(this,n);
-		console.log("CloudantInNode new version");
+
         this.cloudantConfig = _getCloudantConfig(n);
         this.database       = _cleanDatabaseName(n.database, this);
+        console.log("CloudantInNode this.database = " + this.database);
         this.search         = n.search;
         this.design         = n.design;
         this.index          = n.index;
         this.inputId        = "";
 
         var node = this;
+        node.log("cloudantConfig: " + JSON.stringify(node.cloudantConfig));
         var credentials = {
             account:  node.cloudantConfig.account,
             key:      node.cloudantConfig.username,
@@ -241,49 +244,29 @@ module.exports = function(RED) {
 
         Cloudant(credentials, function(err, cloudant) {
             if (err) {
+                node.DBError = err;
                 node.error(err.description, err);
-                node.cloudantError = err;
             }
             else {
-				node.log("CloudantInNode connection succeeded");
                 node.cloudant = cloudant;
             }
         });
-
         node.on("input", function(msg) {
             if (!node.cloudant){
-                //msg.payload = node.cloudantError;
-                msg.payload = null;
-                node.error(node.cloudantError, msg);
+                msg.payload = node.DBError;
+                node.error(node.DBError, msg);
                 return;
             }
             var db = node.cloudant.use(node.database);
-
             var options = (typeof msg.payload === "object") ? msg.payload : {};
 
             if (node.search === "_id_") {
                 var id = getDocumentId(msg.payload);
-                var attachmentName = getAttachementName(msg.payload);
-                var attachmentType = getAttachementType(msg.payload);
                 node.inputId = id;
-                if (attachmentName){
-                    if (attachmentType){
-                        db.attachment.get(id, attachmentName, function(err, body) {
-                            sendAttachementOnPayload(err, body, msg, attachmentType);
-                        });
-                    }else{
-                        db.get(id, function(err, body) {
-                            attachmentType = body._attachments[attachmentName]["content_type"];
-                            db.attachment.get(id, attachmentName, function(err, body) {
-                                sendAttachementOnPayload(err, body, msg, attachmentType);
-                            });
-                        });
-                    }
-                }else{
-                    db.get(id, function(err, body) {
-                        sendDocumentOnPayload(err, body, msg);
-                    });
-                }
+
+                db.get(id, function(err, body) {
+                    sendDocumentOnPayload(err, body, msg);
+                });
             }
             else if (node.search === "_idx_") {
                 options.query = options.query || options.q || formatSearchQuery(msg.payload);
@@ -312,22 +295,7 @@ module.exports = function(RED) {
 
             return payload;
         }
-        function getAttachementName(payload) {
-            if (typeof payload === "object") {
-                if ("attachmentName" in payload) {
-                    return payload.attachmentName;
-                }
-            }
-            return null;
-        }
-        function getAttachementType(payload) {
-            if (typeof payload === "object") {
-                if ("attachmentType" in payload) {
-                    return payload.attachmentType;
-                }
-            }
-            return null;
-        }
+
         function formatSearchQuery(query) {
             if (typeof query === "object") {
                 // useful when passing the query on HTTP params
@@ -342,20 +310,7 @@ module.exports = function(RED) {
             }
             return query;
         }
-        function sendAttachementOnPayload(err, body, msg, attachmentType){
-            if (!err) {
-                msg.cloudant = body;
-                msg.payload = body;
-                msg.headers = {
-                    "Content-Type" : attachmentType
-                }
-            }
-            else {
-                msg.payload = null;
-                node.error(err.description, err);
-            }
-            node.send(msg);
-        }
+
         function sendDocumentOnPayload(err, body, msg) {
             if (!err) {
                 msg.cloudant = body;
@@ -397,9 +352,11 @@ module.exports = function(RED) {
     // password for the Cloudant service at the top-level of the object
     function _getCloudantConfig(n) {
         if (n.service === "_ext_") {
+            console.log("get _ext_ configuration of " + n.cloudant);
             return RED.nodes.getNode(n.cloudant);
 
         } else if (n.service !== "") {
+            console.log("get cloud configuration of " + n.cloudant);
             var service        = appEnv.getService(n.service);
             var cloudantConfig = { };
 
