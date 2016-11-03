@@ -257,7 +257,9 @@ module.exports = function(RED) {
                 node.error(node.DBError, msg);
                 return;
             }
-            var db = node.cloudant.use(node.database);
+            //var db = node.cloudant.use(node.database);
+            var dbName = msg.payload.dbName || node.database;
+            var db = node.cloudant.use(dbName);
             var options = (typeof msg.payload === "object") ? msg.payload : {};
 
             if (node.search === "_id_") {
