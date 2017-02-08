@@ -23,6 +23,11 @@ in JSON format, it will be transformed before being stored.
 For **update** and **delete**, you must pass the `_id` and the `_rev`as part
 of the input `msg` object.
 
+For **insert** and **update**, you can specify that an output message is generated - either
+always (all) or for success or error. In the event of an error the message output will be the original
+message with a dbError field showing the error. For successful inserts or updates, the message output
+will be the original message with the _id and _rev fields updated in either the message body or in the payload.
+
 To **search** for a document you have two options: get a document directly by
 its `_id` or use an existing [search index](https://cloudant.com/for-developers/search/)
 from the database. For both cases, the query should be passed in the

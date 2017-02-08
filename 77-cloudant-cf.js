@@ -80,6 +80,7 @@ module.exports = function(RED) {
 
         this.operation      = n.operation;
         this.payonly        = n.payonly || false;
+        this.outputMsg      = n.outputmsg || "none";
         this.database       = _cleanDatabaseName(n.database, this);
         this.cloudantConfig = _getCloudantConfig(n);
 
@@ -103,7 +104,6 @@ module.exports = function(RED) {
                     return node.error(err.description, err); 
                 }
 
-                delete msg._msgid;
                 handleMessage(cloudant, node, msg);
             });
         });
@@ -134,7 +134,10 @@ module.exports = function(RED) {
         }
 
         function handleMessage(cloudant, node, msg) {
+            var origMsgId = msg._msgid ;
+            delete msg._msgid;
             if (node.operation === "insert") {
+                var origMsg = msg ;
                 var msg  = node.payonly ? msg.payload : msg;
                 var root = node.payonly ? "payload" : "msg";
                 var doc  = parseMessage(msg, root);
@@ -144,6 +147,35 @@ module.exports = function(RED) {
                         console.trace();
                         console.log(node.error.toString());
                         node.error("Failed to insert document: " + err.description, msg);
+                        if (node.outputMsg && (node.outputMsg == "error" 
+                        || node.outputMsg == "all")) {
+                            //send original message on error 
+                            origMsg._msgid = origMsgId ;
+                            origMsg.dbError = {} ;
+
+                            origMsg.dbError.statusCode = err.statusCode;
+                            origMsg.dbError.description = err.description;
+                            origMsg.dbError.message = err.message;
+                            origMsg.dbError.reason = err.reason;
+                            origMsg.dbError.scope = err.scope;
+                            node.send([origMsg]);
+                        }
+                    }
+                    else if (node.outputMsg && (node.outputMsg == "success"
+                    || node.outputMsg == "all")) {
+                        // send message with updated id and rev on success
+                        origMsg._msgid = origMsgId ;
+                        delete origMsg.dbError;  // just in case original message came from error path                      
+                        if (node.payonly) {
+                            origMsg.payload._id = body.id;
+                            origMsg.payload._rev = body.rev;
+                        }
+                        else {
+                            origMsg._id = body.id;
+                            origMsg._rev = body.rev;
+                        }
+
+                        node.send([origMsg]);
                     }
                 });
             }

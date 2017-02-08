@@ -85,6 +85,14 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name" style="width:65%;">
     </div>
+    <div class="form-row">
+        <label for="node-input-outputmsg"><i class="fa fa-wrench"></i>output msg</label>
+        <select type="text" id="node-input-outputmsg" style="width:68%;">
+            <option value="none">none</option>
+            <option value="error">error</option>
+            <option value="success">success</option>
+            <option value="all">all</option>
+        </select>
     <script>
         $("#node-input-operation").change(function() {
             var id = $("#node-input-operation option:selected").val();
@@ -140,7 +148,8 @@
             database: { value:"", required:true, validate:validateDatabase },
             service: { value:"", required:true },
             payonly: { value:false },
-            operation: { value:"insert" }
+            operation: { value:"insert" },
+            outputmsg: { value:"none" }
         },
         inputs: 1,
         outputs: 0,
@@ -150,7 +159,12 @@
         labelStyle: function() {
             return this.name?"node_label_italic":"";
         },
-        oneditprepare: oneditprepare
+        oneditprepare: oneditprepare,
+        oneditsave: function() {
+            var oval = $("#node-input-outputmsg").val();
+            if (oval == "none") this.outputs = 0;
+            else this.outputs = 1;
+        }
     });
 
     RED.nodes.registerType("cloudant in", {
@@ -271,6 +285,14 @@
             <li>All letters in small caps</li>
             <li>The first character can't be <code>_</code></li>
         </ul>
+    </p>
+    <p>
+        You can specify that an output message is generated - either always (all) or for success or error. 
+        In the event of an error the message output will be the original 
+        message with a dbError field showing the error. For successful inserts or updates, 
+        the message output will be the original message with the _id and _rev fields 
+        updated in either the message body or in the payload.
+        The default setting is that no output message is generated.
     </p>
     <p>
         Your document should avoid having top-level fields that start with
