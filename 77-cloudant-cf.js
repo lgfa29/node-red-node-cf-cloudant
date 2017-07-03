@@ -92,15 +92,19 @@ module.exports = function(RED) {
         };
 
         Cloudant(credentials, function(err, cloudant) {
-            if (err) { node.error(err.description, err); }
+            if (err) {
+                node.status({fill:"red", shape:"ring", text:"Cannot connect"});
+                node.error(err.description, err);
+            }
             else {
                 // check if the database exists and create it if it doesn't
                 createDatabase(cloudant, node);
             }
 
             node.on("input", function(msg) {
-                if (err) { 
-                    return node.error(err.description, err); 
+                if (err) {
+                    msg.error = err;
+                    return node.error(err.description, msg);
                 }
 
                 delete msg._msgid;
@@ -117,17 +121,25 @@ module.exports = function(RED) {
                         return;
                     }
                     node.error("Failed to list databases: " + err.description, err);
+                    node.status({fill:"red", shape:"ring", text:"Cannot list databases"});
                 }
                 else {
                     if (all_dbs && all_dbs.indexOf(node.database) < 0) {
                         cloudant.db.create(node.database, function(err, body) {
                             if (err) {
+                                node.status({fill:"red", shape:"ring", text:"Cannot create database"});
                                 node.error(
                                     "Failed to create database: " + err.description,
                                     err
                                 );
                             }
+                            else {
+                              node.status({fill:"green", shape:"ring", text:"Connected"});
+                            }
                         });
+                    }
+                    else {
+                        node.status({fill:"green", shape:"ring", text:"Connected"});
                     }
                 }
             });
@@ -143,7 +155,11 @@ module.exports = function(RED) {
                     if (err) {
                         console.trace();
                         console.log(node.error.toString());
+                        msg.error = err;
                         node.error("Failed to insert document: " + err.description, msg);
+                    } else {
+                        msg.payload = body;
+                        node.send(msg);
                     }
                 });
             }
@@ -154,12 +170,17 @@ module.exports = function(RED) {
                     var db = cloudant.use(node.database);
                     db.destroy(doc._id, doc._rev, function(err, body) {
                         if (err) {
+                            msg.error = err;
                             node.error("Failed to delete document: " + err.description, msg);
+                        }
+                        else {
+                            msg.payload = body;
+                            node.send(msg);
                         }
                     });
                 } else {
-                    var err = new Error("_id and _rev are required to delete a document");
-                    node.error(err.message, msg);
+                    msg.error = new Error("_id and _rev are required to delete a document");
+                    node.error(msg.err.message, msg);
                 }
             }
         }
