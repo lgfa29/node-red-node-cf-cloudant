@@ -22,7 +22,7 @@ module.exports = function(RED) {
 
     var MAX_ATTEMPTS = 3;
 
-    var appEnv   = cfEnv.getAppEnv();
+    var appEnv   = cfEnv.getAppEnv() || {services:{}};
     var services = [];
 
     // load the services bound to this application
@@ -91,26 +91,36 @@ module.exports = function(RED) {
             url: node.cloudantConfig.url
         };
 
-        Cloudant(credentials, function(err, cloudant) {
-            if (err) {
-                node.status({fill:"red", shape:"ring", text:"Cannot connect"});
-                node.error(err.description, err);
-            }
-            else {
-                // check if the database exists and create it if it doesn't
-                createDatabase(cloudant, node);
-            }
-
-            node.on("input", function(msg) {
+        try {
+            Cloudant(credentials, function(err, cloudant) {
                 if (err) {
-                    msg.error = err;
-                    return node.error(err.description, msg);
+                    node.status({fill:"red", shape:"ring", text:"Failed connecting"});
+                    node.error(err.description);
+                }
+                else {
+                    // check if the database exists and create it if it doesn't
+                    createDatabase(cloudant, node);
                 }
 
-                delete msg._msgid;
-                handleMessage(cloudant, node, msg);
+                node.on("input", function(msg) {
+                    if (err) {
+                        msg.error = err;
+                        return node.error(err.description, msg);
+                    }
+
+                    delete msg._msgid;
+                    handleMessage(cloudant, node, msg);
+                });
             });
-        });
+        }
+        catch(e) {
+            node.status({fill:"red", shape:"ring", text:"Cannot connect"});
+            node.error(e);
+            node.on("input", function(msg) {
+                msg.error = e;
+                node.error("Cannot connect to database", msg);
+            });
+        }
 
         function createDatabase(cloudant, node) {
             cloudant.db.list(function(err, all_dbs) {
@@ -147,9 +157,9 @@ module.exports = function(RED) {
 
         function handleMessage(cloudant, node, msg) {
             if (node.operation === "insert") {
-                var msg  = node.payonly ? msg.payload : msg;
+                var body = node.payonly ? msg.payload : msg;
                 var root = node.payonly ? "payload" : "msg";
-                var doc  = parseMessage(msg, root);
+                var doc  = parseMessage(body, root);
 
                 insertDocument(cloudant, node, doc, MAX_ATTEMPTS, function(err, body) {
                     if (err) {
@@ -371,14 +381,15 @@ module.exports = function(RED) {
             return RED.nodes.getNode(n.cloudant);
 
         } else if (n.service !== "") {
-            var service        = appEnv.getService(n.service);
-            var cloudantConfig = { };
+            var service        = appEnv.getService(n.service) || {};
+            var cloudantConfig = {};
 
-            var host = service.credentials.host;
+            var credentials = service.credentials || {};
+            var host = credentials.host || "";
 
-            cloudantConfig.username = service.credentials.username;
-            cloudantConfig.password = service.credentials.password;
-            cloudantConfig.account  = host.substring(0, host.indexOf('.'));
+            cloudantConfig.username = credentials.username || "";
+            cloudantConfig.password = credentials.password || "";
+            cloudantConfig.account  = host.substring(0, host.indexOf('.')) || "";
 
             return cloudantConfig;
         }
