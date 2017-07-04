@@ -81,6 +81,12 @@
                style="display: inline-block; width: auto; vertical-align: top;">
         <label for="node-input-payonly" style="width:65%;">Only store msg.payload object?</label>
     </div>
+    <div class="form-row node-input-payonly">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-successOutput" placeholder="Success Output"
+               style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-successOutput" style="width:65%;">Add a success output?</label>
+    </div>
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="Name" style="width:65%;">
@@ -140,7 +146,8 @@
             database: { value:"", required:true, validate:validateDatabase },
             service: { value:"", required:true },
             payonly: { value:false },
-            operation: { value:"insert" }
+            operation: { value:"insert" },
+            successOutput: { value: false }
         },
         inputs: 1,
         outputs: 0,
@@ -150,7 +157,15 @@
         labelStyle: function() {
             return this.name?"node_label_italic":"";
         },
-        oneditprepare: oneditprepare
+        oneditprepare: function() {
+            var node = this;
+            $('#node-input-successOutput').change(function() {
+                node.outputs = $(this).is(':checked') ? 1 : 0;
+            });
+            if (node.successOutput)
+                node.outputs = 1
+            return oneditprepare.call(this)
+        }
     });
 
     RED.nodes.registerType("cloudant in", {
@@ -263,6 +278,12 @@
         the <b>remove</b> option for the node. You can pass these values in the
         <code>msg</code> object itself or as an object in the
         <code>msg.payload</code>.
+    </p>
+    <p>
+        It is also possible to have a success output. The <code>msg.payload</code>
+        will be de <code>body</code> of callback function. Errors are send throught
+        <code>node.error</code> (You'll have to catch them using the <i>catch</i>
+        mechanism)
     </p>
     <p>
         The <b>database name</b> must follow these rules:
