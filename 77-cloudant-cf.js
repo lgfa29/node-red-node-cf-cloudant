@@ -99,8 +99,8 @@ module.exports = function(RED) {
             }
 
             node.on("input", function(msg) {
-                if (err) { 
-                    return node.error(err.description, err); 
+                if (err) {
+                    return node.error(err.description, err);
                 }
 
                 delete msg._msgid;
@@ -268,6 +268,11 @@ module.exports = function(RED) {
                     options.limit = options.limit || 200;
 
                     db.search(node.design, node.index, options, function(err, body) {
+                        sendDocumentOnPayload(err, body, msg);
+                    });
+                }
+                else if (node.search === "_view_") {
+                    db.view(node.design, node.index, options, function(err, body) {
                         sendDocumentOnPayload(err, body, msg);
                     });
                 }
