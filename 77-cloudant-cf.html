@@ -115,6 +115,7 @@
         <select id="node-input-search" style="width:68%;">
             <option value="_id_">_id</option>
             <option value="_idx_">search index</option>
+            <option value="_view_">view</option>
             <option value="_all_">all documents</option>
         </select>
     </div>
@@ -122,7 +123,7 @@
         <label>&nbsp;</label>
         <input type="text" id="node-input-design" style="width:30%" placeholder="design document">
         /
-        <input type="text" id="node-input-index" style="width:30%" placeholder="index name">
+        <input type="text" id="node-input-index" style="width:30%" placeholder="index/view name">
     </div>
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
@@ -214,7 +215,7 @@
         searchBySelect.change(function() {
             var searchBy = searchBySelect.val();
 
-            if (searchBy === "_idx_") {
+            if (searchBy === "_idx_" || searchBy === "_view_") {
                 node._def.defaults.design.required = true;
                 node._def.defaults.index.required  = true;
                 searchForm.show();

@@ -99,8 +99,8 @@ module.exports = function(RED) {
             }
 
             node.on("input", function(msg) {
-                if (err) { 
-                    return node.error(err.description, err); 
+                if (err) {
+                    return node.error(err.description, err);
                 }
 
                 delete msg._msgid;
@@ -271,6 +271,11 @@ module.exports = function(RED) {
                         sendDocumentOnPayload(err, body, msg);
                     });
                 }
+                else if (node.search === "_view_") {
+                    db.view(node.design, node.index, options, function(err, body) {
+                        sendDocumentOnPayload(err, body, msg);
+                    });
+                }
                 else if (node.search === "_all_") {
                     options.include_docs = options.include_docs || true;
 
@@ -313,9 +318,14 @@ module.exports = function(RED) {
                 if ("rows" in body) {
                     msg.payload = body.rows.
                         map(function(el) {
-                            if (el.doc._id.indexOf("_design/") < 0) {
-                                return el.doc;
+                            if (el.doc) {
+                              if (el.doc._id.indexOf("_design/") < 0) {
+                                  return el.doc;
+                              }
+                            } else {
+                              return el;
                             }
+
                         }).
                         filter(function(el) {
                             return el !== null && el !== undefined;
