@@ -23,15 +23,21 @@ in JSON format, it will be transformed before being stored.
 For **update** and **delete**, you must pass the `_id` and the `_rev`as part
 of the input `msg` object.
 
-To **search** for a document you have two options: get a document directly by
-its `_id` or use an existing [search index](https://cloudant.com/for-developers/search/)
-from the database. For both cases, the query should be passed in the
-`msg.payload` input object as a string.
+To **search** for a document you have three options:
+* get a document directly by its `_id`
+* use an existing [search index](https://cloudant.com/for-developers/search/)
+from the database
+* use an existing [view](https://console.bluemix.net/docs/services/Cloudant/api/using_views.html#using-views)
 
 When getting documents by id, the `payload` will be the desired `_id` value.
+
 For `search indexes`, the query should follow the format `indexName:value`.
+
+For `views`, `payload` should be set be set to an object containing key/value pairs
+as defined in the Query string section in the [Cloudant documentation](https://console.bluemix.net/docs/services/Cloudant/api/using_views.html#using-views)
 
 Authors
 -------
 * Luiz Gustavo Ferraz Aoqui - [laoqui@ca.ibm.com](mailto:laoqui@ca.ibm.com)
 * Túlio Pascoal
+* Adam Hammond

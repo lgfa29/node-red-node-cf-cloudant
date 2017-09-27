@@ -318,9 +318,14 @@ module.exports = function(RED) {
                 if ("rows" in body) {
                     msg.payload = body.rows.
                         map(function(el) {
-                            if (el.doc._id.indexOf("_design/") < 0) {
-                                return el.doc;
+                            if (el.doc) {
+                              if (el.doc._id.indexOf("_design/") < 0) {
+                                  return el.doc;
+                              }
+                            } else {
+                              return el;
                             }
+
                         }).
                         filter(function(el) {
                             return el !== null && el !== undefined;
