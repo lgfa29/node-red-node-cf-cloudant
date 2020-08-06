@@ -3,8 +3,8 @@
   "version": "0.2.16",
   "description": "A Node-RED node to access Cloudant and couchdb databases",
   "dependencies": {
-    "cfenv": "1.0.0",
-    "cloudant": "1.4.*"
+    "cfenv": "^1.2.3",
+    "@cloudant/cloudant": "^4.2.4"
   },
   "repository": {
     "type": "git",
